@@ -12,6 +12,8 @@ class test():
         return None
     
     def printnum(self):
+        a = [2,1,2,3,4]
+        print(a)
         print('ok')
         
 
