@@ -21,52 +21,67 @@ class zigzag():
         deviation = self.deviation
         choice = self.choice
         
-        lows = list()
-        highs = list()
-        indicesLow = list()
-        indicesHigh = list()
+        peaks = list()
+        indices = list()
         # initialize
-        low = min(data[0:int(depth)])
-        lows.append(low)
-        indicesLow.append(data.index(low))
-        high = max(data[0:int(depth)])
-        highs.append(high)
-        indicesHigh.append(data.index(high))
+        if choice == 1:
+            high = max(data[0:int(depth)])
+            peaks.append(high)
+            indices.append(data[0:int(depth)].index(high))
+        else:
+            low = min(data[0:int(depth)])
+            peaks.append(low)
+            indices.append(data[0:int(depth)].index(low))
 
-        flag = 1 - choice
-        for i in range(int(depth),int(len(data)-depth)):
+        flag = choice
+        i = indices[-1]
+        while i < int(len(data)-depth):
+            flag = 1 - flag
             if flag == 0:
                 # find next low point
-                if lows[-1] > data[i]:
-                    low = data[i]
-                    lows.append(low)
-                    indicesLow.append(i)
-                    flag = 1
-                    index = data.index(lows[0])
-                    # delete the low point that is not in comparison zone
-                    if index <= i-depth:
-                        del(lows[0]) 
-                    # if the point is extremely low
-                    if min(lows) - low > deviation:
-                        for j in range(i-backstep,i):
-                            if data[j] > low and lows[-1] == data[j]:
-                                del(lows[-1])
+                if len(peaks) <= 3:
+                    if peaks[-1] > min(data[i:i+depth-1]):
+                        low = min(data[i:i+depth-1])
+                        peaks.append(low)
+                        indices.append(data[i:i+depth-1].index(low)+i)
+                        i = indices[-1]
+                    else:
+                        i = 1 + i
+                else:
+                    indices = indices[0:len(indices)-2]
+                    i = indices[-1]
+                    low = min(data[i:i+depth-1])
+                    peaks.append(low)
+                    indices.append(data[i:i+depth-1].index(low)+i)
             else:
                 # find next high point
-                if highs[-1] < data[i]:
-                    high = data[i]
-                    highs.append(high)
-                    indicesHigh.append(i)
-                    flag = 0
-                    index = data.index(highs[0])
-                    # delete the point that is not in comparison zone
-                    if index <= i-depth:
-                        del(highs[0])
-                    # if the point is extremely high
-                    if high - max(highs) > deviation:
-                        for j in range(i-backstep,i):
-                            if data[j] < high and highs[-1] == data[j]:
-                                del(highs[-1])
+                if len(peaks) <= 3:
+                    if peaks[-1] < max(data[i:i+depth-1]):
+                        high = max(data[i:i+depth-1])
+                        peaks.append(high)
+                        indices.append(data[i:i+depth-1].index(high)+i)
+                        i = indices[-1]
+                    else:
+                        i = 1 + i
+                else:
+                    indices = indices[0:len(indices)-2]
+                    i = indices[-1]
+                    high = max(data[i:i+depth-1])
+                    peaks.append(high)
+                    indices.append(data[i:i+depth-1].index(high)+i)
+            
+            # if the point is extremely low or high
+            if len(peaks) > 3 and abs(peaks[-1] - peaks[-3]) > deviation:
+                for j in range(indices[-1]-backstep,indices[-1]):
+                    if (data[j] > peaks[-1]) and (j in indices):
+                        indices.remove(j)
+                peaks = peaks[0:len(indices)]
+
+            print(peaks)
+            print(indices)
+            set_trace()
+
+        return peaks, indices
 
 
 if __name__ == '__main__':
@@ -81,4 +96,6 @@ if __name__ == '__main__':
     data = list(pd.read_excel('windData.xlsx',index_col = 0)['CLOSE'])
     print(data)
     set_trace()
-    zigzag.handle(data)
+    peaks, indices = zigzag.handle(data)
+    print(peaks)
+    print(indices)

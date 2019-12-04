@@ -13,10 +13,15 @@ class test():
     
     def printnum(self):
         a = [2,1,2,3,4]
-        print(a)
+        print(a[2:4].index(2))
         print('ok')
         
 
 if __name__ == '__main__':
+    if 1 in [1,2,3,4]:
+        print('true')
+    a = [1,2,3,4,5]
+    a.remove(3)
+    print(a)
     test = test()
     test.printnum()
