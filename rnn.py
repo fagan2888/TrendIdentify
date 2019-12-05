@@ -17,6 +17,7 @@ from WindPy import *
 from config import *
 import talib
 from sqlalchemy import *
+from ipdb import set_trace
 
 def loadDataFromTerminal(code, sdate, edate):   
     w.start()
@@ -25,7 +26,7 @@ def loadDataFromTerminal(code, sdate, edate):
     return df
 
 def loadData(scode = '000000', ecode = '999999', sdate = '19900101', edate = '20200101'):
-    db = create_engine(uris['wind_db']) 
+    db = create_engine(uris['wind']) 
     meta = MetaData(bind = db)
     t = Table('asharel2indicators', meta, autoload = True)
     columns = [
@@ -40,10 +41,10 @@ def loadData(scode = '000000', ecode = '999999', sdate = '19900101', edate = '20
     sql = sql.where(t.c.TRADE_DT.between(sdate, edate))
     df = pd.read_sql(sql, db)
     df.code = df.code.apply(lambda x: x[0:6])
-    df = df[df['code'] < ecode && df['code'] > scode]
+    df = df[df['code'] <= ecode & df['code'] >= scode]
     df.sort_values('date', ascending = True, inplace = True)
     df = df.dropna(axis = 0, how = 'any')
-    df.set_index(['date','code'] inplace = True)
+    df.set_index(['date','code'], inplace = True)
 
     return df
 
