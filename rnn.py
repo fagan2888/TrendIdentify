@@ -16,10 +16,35 @@ import pandas as pd
 from WindPy import *
 from config import *
 import talib
+from sqlalchemy import *
 
-def loadData(code, sdate, edate):   
+def loadDataFromTerminal(code, sdate, edate):   
     w.start()
     _,df = w.wsd(code, "dealnum,volume,amt,close", sdate, edate, usedf = True)
+    
+    return df
+
+def loadData(scode = '000000', ecode = '999999', sdate = '19900101', edate = '20200101'):
+    db = create_engine(uris['wind_db']) 
+    meta = MetaData(bind = db)
+    t = Table('asharel2indicators', meta, autoload = True)
+    columns = [
+            t.c.S_INFO_WINDCODE.label('code'),
+            t.c.TRADE_DT.label('date'),
+            t.c.S_LI_INITIATIVEBUYRATE.label('activeBuy'),
+            t.c.S_LI_INITIATIVESELLRATE.label('activeSell'),
+            t.c.S_LI_LARGEBUYRATE.label('mainForceBuy'),
+            t.c.S_LI_LARGESELLRATE.label('mainForceSell'),
+            ]
+    sql = select(columns)
+    sql = sql.where(t.c.TRADE_DT.between(sdate, edate))
+    df = pd.read_sql(sql, db)
+    df.code = df.code.apply(lambda x: x[0:6])
+    df = df[df['code'] < ecode && df['code'] > scode]
+    df.sort_values('date', ascending = True, inplace = True)
+    df = df.dropna(axis = 0, how = 'any')
+    df.set_index(['date','code'] inplace = True)
+
     return df
 
 def indicators(code, sdate, edate):
@@ -104,5 +129,9 @@ def handle(code, sdate, edate):
     
     
 if __name__ == '__main__':
+    
+    df = loadData('000001', '000002')
+    print(df)
+    set_trace()
     
     output = handle('000001.SZ','2019-01-02','2019-12-05')
