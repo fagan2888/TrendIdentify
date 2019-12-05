@@ -28,7 +28,7 @@ class MBSS():
         
         return df
     
-    def handle(self,df):
+    def mbss(self,df):
         
         MBSS = list()
         for i in range(len(df)):
@@ -65,4 +65,4 @@ if __name__ == '__main__':
     options, args = opt.parse_args()
     MBSS = MBSS(options.code, options.sdate, options.edate)
     df = MBSS.loadData()
-    out = MBSS.handle(df)
+    out = MBSS.mbss(df)
