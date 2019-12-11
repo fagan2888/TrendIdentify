@@ -1,5 +1,5 @@
 
-# trace catch 
+# trend catch 
 # design an algorithm to catch a trend using as little data as possible
 # trend is defined as the similarity of risk(variance) and return(average value)
 # use Euclidean distance to show the similarity
@@ -12,7 +12,7 @@ from optparse import OptionParser
 from sqlalchemy import *
 import tensorflow as tf
 
-class trace(error, derivative, length):
+class trend(error, derivative, length):
 
     def __init__(self):
         self.error = error
@@ -64,5 +64,5 @@ if __name__ == '__main__':
     opt.add_option('-d','--derivative', help = 'derivative', dest = 'derivative', default = 1)
     options, args = parse_arg()
     length = 
-    trace = trace(options.error, options.derivative, length)
-    trace.handle()
+    trend = trend(options.error, options.derivative, length)
+    trend.handle()

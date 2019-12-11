@@ -117,9 +117,7 @@ def loadData(scode, ecode, codes, sdate, edate):
 
     df = pd.merge(df, df3, left_index = True, right_index = True)
 
-    df['mbss'] = 0.0
-    for i in range(len(df)):
-        df['mbss'][i] = df['volume'][i]/df['deals'][i]
+    df['mbss'] = df.apply(lambda x: x['volume']/x['deals'], axis = 1)
     df = df.drop('deals',axis = 1)
 
     t = Table('ashareeodderivativeindicator', meta, autoload = True)
