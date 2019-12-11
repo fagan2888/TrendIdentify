@@ -5,7 +5,8 @@ Created on Mon Nov 25 10:26:17 2019
 @author: 86156
 """
 
-# build a RNN using tensorflow 
+# build a RNN using keras 
+# all data is from wind database
 
 import numpy as np
 import tensorflow as tf
@@ -25,7 +26,26 @@ from ipdb import set_trace
 #    
 #    return df
 
+def indexMembers(indexCode):
+    
+    db = create_engine(uris['wind'])
+    meta = MetaData(bind = db)
+    t = Table('aindexmembers', meta, autoload = True)
+    columns = [
+            t.c.S_CON_WINDCODE.label('code'),
+            ]
+    sql = select(columns)
+    sql = sql.where(t.c.S_INFO_WINDCODE == indexCode)
+    sql = sql.where(t.c.S_CON_OUTDATE.is_(None))
+    codes = pd.read_sql(sql, db)
+    codes['code'] = codes['code'].apply(lambda x: x[0:6])
+    codes = list(codes['code'])
+
+    return codes
+
+
 def loadData(scode, ecode, codes, sdate, edate):
+    
     db = create_engine(uris['wind']) 
     meta = MetaData(bind = db)
     t = Table('asharedescription', meta,autoload = True)
@@ -51,11 +71,11 @@ def loadData(scode, ecode, codes, sdate, edate):
     sql = select(columns)
     sql = sql.where(t.c.TRADE_DT.between(sdate, edate))
     sql = sql.where(t.c.S_INFO_WINDCODE.in_(windCodes))
-    df = pd.read_sql(sql, db)
-    df.code = df.code.apply(lambda x: x[0:6])
-    df.sort_values('date', ascending = True, inplace = True)
-    df = df.dropna(axis = 0, how = 'any')
-    df.set_index(['code','date'], inplace = True)
+    df1 = pd.read_sql(sql, db)
+    df1.code = df1.code.apply(lambda x: x[0:6])
+    df1.sort_values('date', ascending = True, inplace = True)
+    df1 = df1.dropna(axis = 0, how = 'any')
+    df1.set_index(['code','date'], inplace = True)
     
     t = Table('ashareeodprices', meta, autoload = True)
     columns = [
@@ -78,12 +98,52 @@ def loadData(scode, ecode, codes, sdate, edate):
     df2 = df2.dropna(axis = 0, how = 'any')
     df2.set_index(['code','date'], inplace = True)
 
-    df = pd.merge(df, df2, left_index = True, right_index = True) 
+    df = pd.merge(df1, df2, left_index = True, right_index = True) 
+
+    t = Table('asharemoneyflow', meta, autoload = True)
+    columns = [
+            t.c.S_INFO_WINDCODE.label('code'),
+            t.c.TRADE_DT.label('date'),
+            t.c.TRADES_COUNT.label('deals'),
+            ]
+    sql = select(columns)
+    sql = sql.where(t.c.TRADE_DT.between(sdate, edate))
+    sql = sql.where(t.c.S_INFO_WINDCODE.in_(windCodes))
+    df3 = pd.read_sql(sql, db)
+    df3.code = df3.code.apply(lambda x: x[0:6])
+    df3.sort_values('date', ascending = True, inplace = True)
+    df3 = df3.dropna(axis = 0, how = 'any')
+    df3.set_index(['code','date'], inplace = True)
+
+    df = pd.merge(df, df3, left_index = True, right_index = True)
+
+    df['mbss'] = 0.0
+    for i in range(len(df)):
+        df['mbss'][i] = df['volume'][i]/df['deals'][i]
+    df = df.drop('deals',axis = 1)
+
+    t = Table('ashareeodderivativeindicator', meta, autoload = True)
+    columns = [
+            t.c.S_INFO_WINDCODE.label('code'),
+            t.c.TRADE_DT.label('date'),
+            t.c.S_DQ_MV.label('marketPrice'),
+            t.c.S_VAL_MV.label('totalPrice'),
+            ]
+    sql = select(columns)
+    sql = sql.where(t.c.TRADE_DT.between(sdate, edate))
+    sql = sql.where(t.c.S_INFO_WINDCODE.in_(windCodes))
+    df4 = pd.read_sql(sql, db)
+    df4.code = df4.code.apply(lambda x: x[0:6])
+    df4.sort_values('date', ascending = True, inplace = True)
+    df4 = df4.dropna(axis = 0, how = 'any')
+    df4.set_index(['code','date'], inplace = True)
+
+    df = pd.merge(df, df4, left_index = True, right_index = True)
 
     return df
 
 def indicators(dfBasic):
-    df = pd.DataFrame(columns = ['code','date','indicator1', 'indicator2', 'indicator3', 'indicator4', 'indicator5', 'indicator6', 'dailyReturn']) 
+    df = pd.DataFrame(columns = ['code','date','indicator1', 'indicator2', 'indicator3', 'indicator4', 'indicator5', 'indicator6','indicator7', 'indicator8','indicator9','dailyReturn']) 
 #    MBSS = list()
 #    for i in range(len(dfBasic)):
 #        mbss = dfBasic['VOLUME'][i] / dfBasic['DEALNUM'][i]
@@ -106,6 +166,9 @@ def indicators(dfBasic):
     indicator4 = list(dfBasic.mainForceSell)
     indicator5 = list(dfBasic.amount)
     indicator6 = list(dfBasic.volume)
+    indicator7 = list(dfBasic.mbss)
+    indicator8 = list(dfBasic.marketPrice)
+    indicator9 = list(dfBasic.totalPrice)
     df.code = list(dfBasic.index.get_level_values(0).values)
     df.date = list(dfBasic.index.get_level_values(1).values)
     df.indicator1 = indicator1
@@ -114,6 +177,9 @@ def indicators(dfBasic):
     df.indicator4 = indicator4
     df.indicator5 = indicator5
     df.indicator6 = indicator6
+    df.indicator7 = indicator7
+    df.indicator8 = indicator8
+    df.indicator9 = indicator9
     df.dailyReturn = list(dfBasic.dailyReturn)
     
     df = df.dropna(axis = 0, how = 'any')
@@ -128,6 +194,25 @@ def indicators(dfBasic):
     dfNew = dfNew.reset_index(drop = True)
     
     return dfNew
+
+def tansform(df, backSteps):
+    timeLength = int(backSteps)
+    members = len(set(list(df.code)))
+    slides = int(len(df) - backSteps * members)
+    parameters = df.shape[1] - 3
+    x = df.copy().drop('dailyReturn',axis = 1)
+    x = x.drop('date', axis = 1)
+    codes = list(set(list(x.code)))
+    x = x.groupby('code')
+    # x should be a 3D tensor for RNN input
+    X = np.zeros((slides, slides*timeLength, parameters))
+    y = list()
+    for k in range(members):
+        for j in range(slides*timeLength - timeLength):
+            X[k,j:j+timeLength,:] = x.get_group(codes[k]).drop('code', axis = 1).iloc[j:j+timeLength]
+        y = y + (list(df[df.code == codes[k]].dailyReturn)[backStep:len(df[df.code == codes[k]])])
+ 
+    return X ,y
 
 def divide(x, r):
     num = len(x)
@@ -158,29 +243,21 @@ def train(x, y, model, e = 0.33):
         model.fit(x, y, epochs = 1, batch_size = 16)
         [loss, acc] = model.evaluate(x, y)
         if loss < e:
+            print('model well-trained! loss is less than:', loss)
             break
-        
+    
+    print('model not well-trained! please change epoch and batch_size!')
+
     return model
 
-def handle(scode = '000000', ecode = '999999', codes = [], sdate = '19900101', edate = '20200101'):
+def handle(scode = '000000', ecode = '999999', codes = [], sdate = '19900101', edate = '20200101', backSteps = 10):
     
     dfBasic = loadData(scode, ecode, codes, sdate, edate)
     df = indicators(dfBasic)
 
-    timeLength = len(set(list(df.date)))
-    memebers = len(set(list(df.code)))
-    parameters = df.shape[1] - 3
-    x = df.copy().drop('dailyReturn',axis = 1)
-    x = x.drop('date', axis = 1)
-    codes = list(set(list(x.code)))
-    x = x.groupby('code')
-    # x should be a 3D tensor for RNN input
-    X = np.zeros((timeLength,memebers,parameters))
-    for k in range(memebers):
-        X[:,k,:] = x.get_group(codes[k]).drop('code', axis = 1)
-
-    y = list(df.dailyReturn)
-    
+    # transform dataframe into matrics that can feed into rnn
+    # use the x values of the last backSteps to pridict y values now
+    X, y = transform(df, backSteps) 
     print(X.shape)
     print(len(y))
     set_trace()
@@ -190,9 +267,10 @@ def handle(scode = '000000', ecode = '999999', codes = [], sdate = '19900101', e
     xTrain, xTest = divide(X, r)
     yTrain, yTest = divide(y, r)
 
+    parameters = df.shape[1] - 3
     # x shape(slides, time_steps, parameters)
     # y shape(slides, returns)    
-    proto = build(memebers, parameters)
+    proto = build(backSteps, parameters)
     model = train(xTrain,yTrain,proto)
     [loss, acc] = model.evaluate(xTest, yTest)
     print(loss)
@@ -206,4 +284,7 @@ def handle(scode = '000000', ecode = '999999', codes = [], sdate = '19900101', e
     
     
 if __name__ == '__main__':
-    output = handle(codes = ['000001'], sdate = '19960701', edate = '20101230')
+    # use 沪深300 as default index
+    indexCode = '399300.SZ'
+    codes = indexMembers(indexCode)
+    output = handle(codes = codes, sdate = '19960701', edate = '20181230')
