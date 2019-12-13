@@ -259,13 +259,20 @@ def train(x, y, model, e = 0.33):
 
 def handle(scode = '000000', ecode = '999999', codes = [], sdate = '19900101', edate = '20200101', backSteps = 10):
     
-#    dfBasic = loadData(scode, ecode, codes, sdate, edate)
-#    df = indicators(dfBasic)
+    dfBasic = loadData(scode, ecode, codes, sdate, edate)
+    df = indicators(dfBasic)
 #    df.to_excel('basicData.xlsx')
 
-    df = pd.read_excel('basicData.xlsx', index_col = 0)
+#    df = pd.read_excel('basicData.xlsx', index_col = 0)
     df.code = df.code.apply(lambda x: str(x).zfill(6))
     df.date = df.date.map(lambda x: str(x))
+
+    print('start from: ',min(df.date))
+    print('end at: ', max(df.date))
+    set_trace()
+    #df = df[df['date'] > '20150101']
+    #print(df)
+    #set_trace()
     
     # transform dataframe into matrics that can feed into rnn
     # use the x values of the last backSteps to pridict y values now
@@ -273,7 +280,7 @@ def handle(scode = '000000', ecode = '999999', codes = [], sdate = '19900101', e
     
     # divided X and y into training group and testing group
     # the proportion of number of elements in testing group and training group is r
-    r = 4 / 6 
+    r = 1 / 9 
     xTrain, xTest = divide(X, r)
     yTrain, yTest = divide(y, r)
 
@@ -282,18 +289,32 @@ def handle(scode = '000000', ecode = '999999', codes = [], sdate = '19900101', e
     # x shape(slides, time_steps, parameters)
     # y shape(slides, returns)    
     proto = build(backSteps, parameters)
+
+    proto.fit(xTrain,yTrain, epochs = 100, batch_size = 64)
+    print('pre-train done!')
+    set_trace()
+
     model = train(xTrain,yTrain,proto)
     [loss, acc] = model.evaluate(xTest, yTest)
     print('loss for test group is ', loss)
     print('accuracy for test group is', acc)
-    out = model.predict(xt, batch_size = 1)
-    print('predict value:',out)
-    model.save('new.h5')
-    print('model saved!')
+    #out = model.predict(xt, batch_size = 1)
+    #print('predict value:',out)
+    if loss < (0.33 + 0.001):
+        model.save('new.h5')
+        print('useful model saved!')
+    else:
+        print('model cannot be used for test group please change!')
     
     
 if __name__ == '__main__':
     # use 沪深300 as default index
-    indexCode = '399300.SZ'
-    codes = indexMembers(indexCode)
+    #indexCode = '399300.SZ'
+    #codes = indexMembers(indexCode)
+    #codes = ['601318'] # 中国平安 排除
+    #codes = ['000559'] # 万向钱潮
+    #codes = ['002582'] # 好想你
+    #codes = ['600276'] # 恒瑞医药 排除
+    codes = ['000651'] # 格力电器 较好
+    #codes = ['600519'] # 贵州茅台 排除
     output = handle(codes = codes, sdate = '19960701', edate = '20181230')
