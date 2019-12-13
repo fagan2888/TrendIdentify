@@ -218,6 +218,14 @@ def transform(df, backSteps):
         for j in range(length-timeLength):
             X[j,:,:] = x.iloc[j:j+timeLength,:]
         y = y + (list(df[df.code == code].dailyReturn)[backSteps:length])
+
+    # if we do not care about the specific data or daily return and only care about the sign
+    # change the y into 0,1 series in which 0 means minus and 1 means plus
+    for i in range(len(y)):
+        if y[i] <= 0:
+            y[i] = 0
+        else:
+            y[i] = 1
  
     return X ,y
 
@@ -234,22 +242,32 @@ def build(timeLength, parameters):
     # define a LSTM model
     # input_shape(n_steps, n_parameters)
     model = Sequential()
-    model.add(LSTM(100, input_shape=(timeLength, parameters)))
+    model.add(LSTM(200, input_shape=(timeLength, parameters)))
+    model.add(Dense(100, activation = 'selu'))
     model.add(Dense(80, activation = 'selu'))
-    model.add(Dense(40, activation = 'selu'))
-    model.add(Dense(10, activation = 'selu'))
-    model.add(Dense(1))
+    model.add(Dense(20, activation = 'selu'))
     
-    model.compile(optimizer = 'RMSprop', loss = 'mse', metrics = ['accuracy'])
+#    model.add(Dense(1))
+#    model.compile(optimizer = 'RMSprop', loss = 'mse', metrics = ['accuracy'])
+    
+    # if do not care about specific value but only care about the sign use following structure
+    model.add(Dense(1, activation = 'sigmoid'))
+    model.compile(optimizer = 'RMSprop', loss = 'binary_crossentropy', metrics = ['accuracy'])
     
     return model
 
-def train(x, y, model, e = 0.33):
+def train(x, y, model, e = 0.33, a = 0.90):
     # train the model
     for i in range(1,30000):
         model.fit(x, y, epochs = 1, batch_size = 16)
         [loss, acc] = model.evaluate(x, y)
-        if loss < e:
+        
+#        if loss < e:
+#            print('model well-trained! loss is less than:', loss)
+#            return model
+        
+        # if do not care about specific value but only care about the sign use following structure
+        if acc > a:
             print('model well-trained! loss is less than:', loss)
             return model
     
@@ -300,7 +318,9 @@ def handle(scode = '000000', ecode = '999999', codes = [], sdate = '19900101', e
     print('accuracy for test group is', acc)
     #out = model.predict(xt, batch_size = 1)
     #print('predict value:',out)
-    if loss < (0.33 + 0.001):
+    #if loss < (0.33 + 0.001):
+    # if only care about sign use acc
+    if acc > 0.8:
         model.save('new.h5')
         print('useful model saved!')
     else:
