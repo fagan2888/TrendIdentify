@@ -183,7 +183,7 @@ def indicators(dfBasic):
     df = df.dropna(axis = 0, how = 'any')
     df.sort_values(by = 'date', ascending = True, inplace = True)
 
-    # make sure that every code has data every day if not clear all the data that day
+    # make sure that every code has data every day. if not, clear all the data that day
     dfNew = pd.DataFrame(columns = df.columns)
     codeNumbers = len(set(list(df.code)))
     for date in list(df.date):
@@ -193,22 +193,31 @@ def indicators(dfBasic):
     
     return dfNew
 
-def tansform(df, backSteps):
+def transform(df, backSteps):
     timeLength = int(backSteps)
     members = len(set(list(df.code)))
     slides = int(len(df) - backSteps * members)
     parameters = df.shape[1] - 3
     x = df.copy().drop('dailyReturn',axis = 1)
-    x = x.drop('date', axis = 1)
+    x.set_index('date', inplace = True)
     codes = list(set(list(x.code)))
-    x = x.groupby('code')
+    
+    # normalization
+    for i in range(1,x.shape[1]):
+        minValue = min(x.iloc[:,i])
+        maxValue = max(x.iloc[:,i])
+        x.iloc[:,i] = x.iloc[:,i].map(lambda x: (x-minValue)/(maxValue-minValue))
+    xg = x.groupby('code')
+    
     # x should be a 3D tensor for RNN input
-    X = np.zeros((slides, slides*timeLength, parameters))
+    X = np.zeros((slides, timeLength, parameters))
     y = list()
-    for k in range(members):
-        for j in range(slides*timeLength - timeLength):
-            X[k,j:j+timeLength,:] = x.get_group(codes[k]).drop('code', axis = 1).iloc[j:j+timeLength]
-        y = y + (list(df[df.code == codes[k]].dailyReturn)[backStep:len(df[df.code == codes[k]])])
+    for code in codes:
+        x = xg.get_group(code).sort_index().drop('code', axis = 1)
+        length = len(x)
+        for j in range(length-timeLength):
+            X[j,:,:] = x.iloc[j:j+timeLength,:]
+        y = y + (list(df[df.code == code].dailyReturn)[backSteps:length])
  
     return X ,y
 
@@ -242,7 +251,7 @@ def train(x, y, model, e = 0.33):
         [loss, acc] = model.evaluate(x, y)
         if loss < e:
             print('model well-trained! loss is less than:', loss)
-            break
+            return model
     
     print('model not well-trained! please change epoch and batch_size!')
 
@@ -250,15 +259,18 @@ def train(x, y, model, e = 0.33):
 
 def handle(scode = '000000', ecode = '999999', codes = [], sdate = '19900101', edate = '20200101', backSteps = 10):
     
-    dfBasic = loadData(scode, ecode, codes, sdate, edate)
-    df = indicators(dfBasic)
+#    dfBasic = loadData(scode, ecode, codes, sdate, edate)
+#    df = indicators(dfBasic)
+#    df.to_excel('basicData.xlsx')
 
+    df = pd.read_excel('basicData.xlsx', index_col = 0)
+    df.code = df.code.apply(lambda x: str(x).zfill(6))
+    df.date = df.date.map(lambda x: str(x))
+    
     # transform dataframe into matrics that can feed into rnn
     # use the x values of the last backSteps to pridict y values now
     X, y = transform(df, backSteps) 
-    print(X.shape)
-    print(len(y))
-    set_trace()
+    
     # divided X and y into training group and testing group
     # the proportion of number of elements in testing group and training group is r
     r = 4 / 6 
@@ -266,17 +278,16 @@ def handle(scode = '000000', ecode = '999999', codes = [], sdate = '19900101', e
     yTrain, yTest = divide(y, r)
 
     parameters = df.shape[1] - 3
+    
     # x shape(slides, time_steps, parameters)
     # y shape(slides, returns)    
     proto = build(backSteps, parameters)
     model = train(xTrain,yTrain,proto)
     [loss, acc] = model.evaluate(xTest, yTest)
-    print(loss)
-    print(acc)
-    set_trace()
+    print('loss for test group is ', loss)
+    print('accuracy for test group is', acc)
     out = model.predict(xt, batch_size = 1)
-    print(out)
-    set_trace()
+    print('predict value:',out)
     model.save('new.h5')
     print('model saved!')
     
