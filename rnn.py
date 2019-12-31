@@ -320,7 +320,7 @@ def handle(scode = '000000', ecode = '999999', codes = [], sdate = '19900101', e
     #print('predict value:',out)
     #if loss < (0.33 + 0.001):
     # if only care about sign use acc
-    if acc > 0.8:
+    if acc > 0.65:
         model.save('new.h5')
         print('useful model saved!')
     else:

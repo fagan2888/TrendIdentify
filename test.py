@@ -19,9 +19,18 @@ class test():
         a = [2,1,2,3,4]
         print(a[2:4].index(2))
         print('ok')
+
+def tryA():
+    try:
+        a = set(1,1)
+        print('ok')
+    except:
+        print('yes')
         
 
 if __name__ == '__main__':
+    tryA()
+    set_trace()
 #    if 1 in [1,2,3,4]:
 #        print('true')
 #    a = [1,2,3,4,5]
